@@ -7,14 +7,13 @@
 # plus the grid geometry and ID.
 
 # load grid : 9852 cells that cover the whole Mediterranean basin
-m_grid2 <- st_read("cybelle/data/med_grid.shp", crs=4326)
+m_grid2 <- st_read("data/med_grid.shp", crs=4326)
 
 # to avoid confusions, change name of the grid to specify that it will contain the
 # environmental measures for a given time. In this case, I chose mean values of over May 2020.
 m_grid_may20 <- m_grid2
 
-# rename variable to be consistent with the rest of the analysis
-m_grid_may20 <- rename(m_grid_may20, site.to.coast = dtocoast)
+
 # extract coordiantes from cell centroids, which are the points at which the environmental 
 # variables will be extracted from 
 centroids <- m_grid_may20 %>% 
@@ -30,7 +29,7 @@ centroids <- m_grid_may20 %>%
 
 # bathymetry
 
-bathymetry <- raster("cybelle/data/Bathymetry.asc")
+bathymetry <- raster("data/Bathymetry.asc")
 m_grid_may20$bathymetry <- raster::extract(bathymetry, centroids)
 
 # remove cells where bathymetry = NA, such that the grid is centered on the NW medtiterranean
@@ -47,10 +46,10 @@ centroids <- m_grid_may20 %>%
 
 # Monthly chla and sst data in .nc files
 
-chla <- raster("cybelle/data/chla_july2020.nc")
+chla <- raster("data/chla_july2020.nc")
 m_grid_may20$chla <- raster::extract(chla, centroids)
 
-sst <- raster("cybelle/data/sst_july2020.nc")
+sst <- raster("data/sst_july2020.nc")
 m_grid_may20$sst <- raster::extract(sst, centroids)
 
 

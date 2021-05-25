@@ -1,4 +1,5 @@
-# script based on dauphin_occ2
+
+
 
 library(magrittr)
 library(tidyr)
@@ -6,45 +7,39 @@ library(dplyr)
 library(unmarked)
 library(ggplot2)
 library(sf)
+library(raster)
 library(ncdf4)
 library(mapview)
 library(maps)
 library(maptools)
 
-# library(lubridate)
-# library(rgdal)
-# library(geosphere)
 
 options(scipen = 999)
 theme_set(theme_minimal())
 
+# download data (ask me by writing at camille.coux@orange.fr)
+
 # import obs data
-track <- read.csv2("data/track2.csv", row.names = 1)
+track <- read.csv2("data/track.csv", row.names = 1)
 
 # import grid:
-m_grid <- st_read("data/env_data/mediterranee shapefiles/med_grid.shp", crs=4326)
+m_grid <- st_read("data/med_grid.shp", crs=4326)
+
+# view grid in browser:
 # mapview(m_grid$geometry,viewer.suppress = TRUE )
 
-
-stripeddolphin_sf <- striped_dolphin %>%
-  filter(n>0) %>%
-  st_as_sf(coords=c("long", "lat"), crs=4326)
-mapview(stripeddolphin_sf, zcol="protocole2", viewer.suppress = TRUE )
-
-
-# intersect obs data with grid cells:
-
+# intersect obs data with grid cells to get the grid_id column in the track dataset :
 inter <- track %>%
   st_as_sf(coords=c("long", "lat"), crs=4326) %>%
-  st_intersection(m_grid, track_sf)
+  st_intersection(m_grid, track_sf) %>%
+  rename(grid_id = FID)
 track <- left_join(track, inter%>%dplyr::select(grid_id, index))
 
-
-# select observations for the striped dolphin species, i.e. "dauphin bleu et blanc" in french:
+# select observations for a given species, e.g. striped dolphin species, 
+# i.e. "dauphin bleu et blanc" in french:
 presences <- track[grep("Dauphin Bleu", track$species),]
 # selection of all absences  
 absences <- track[which(is.na(track$species)),]
-# write.csv2(absences, "../cartes/absences.csv ")
 
 # merge
 striped_dolphin <- rbind(presences, absences)
@@ -61,16 +56,14 @@ striped_dolphin <- striped_dolphin %>%
 table(striped_dolphin$month, striped_dolphin$year)
 striped_dolphin <- striped_dolphin %>% filter(year %in% c(2015:2020))
 
-d <- striped_dolphin %>%
-  dplyr::select(grid_id, year, n)
-
-
+# select columns necessary for the analysis, and remove NAs
 d <- striped_dolphin %>%
   dplyr::select(bathymetry, site.to.coast, chla, sst) %>%
   complete.cases
 striped_dolphin <- striped_dolphin[d,]
 
-# create An RxJ matrix of the detection, non-detection data, where: 
+# format data to create the unmarked data frame object
+# 1. create An RxJ matrix of the detection, non-detection data, where: 
 # R =  number of sites
 # J = maximum number of sampling periods per site
 
@@ -80,10 +73,8 @@ RJ_mat <- striped_dolphin %>%
    pivot_wider(names_from = year, values_from=n, names_prefix = "Y")
 RJ_mat <- RJ_mat[,c(1, 7, 3, 2, 6, 4, 5)]
 
-RJ_mat[,2:7] %>% is.na %>% rowSums %>% sort %>% unique
-
-
 # Select observation variables : chla and SST
+# calculate the mean chla and sst values for each grid cell:
 chla <- striped_dolphin %>% 
   group_by(grid_id, year) %>%
   summarise(chla = mean(chla, na.rm = T)) %>%
@@ -104,8 +95,7 @@ obscovs <- list(chla[,-1] , sst[,-1])
 names(obscovs) <- c("chla", "sst")
 
 # Select site covariates : bathymetry and distance from site to coast
-# bathymetry: need to calculate means for each site based on the bathymetry
-# values from each observation:
+# calculate the mean bathymetry and site.to.coast values for each grid cell:
 sitecovs <- striped_dolphin %>% 
   group_by(grid_id) %>%
   summarise(bathymetry.sites = round(mean(bathymetry, na.rm=T), digits = 1),
@@ -126,23 +116,21 @@ summary(umf)            # summarize
 
 occu.model = occu(~chla + sst ~ bathymetry.sites+site.to.coast, umf)
 
-models <- dredge(occu.model)
-#models with delta.aicc < 2
-summary(model.avg(models, subset = delta < 2))
-
-
 
 
 #--------- carte sans model-averaging (debut) --------------------------
 # read in Med grid with environmental variables extracted for May 2020:
-source("cybelle/extract_env_data.R")
+source("code/extract_env_data.R")
+# there will be warnings, they're ok for this purpose
+
+# check NAs
 m_grid_may20 %>% apply(., 2, is.na) %>% colSums
 
 # remove lines with NAs:
 m_grid_may20 <- m_grid_may20[-which(is.na(m_grid_may20$chla)), ]
 
 # values used to standardise the unmarked dataframe variables: need to apply
-# the same values to all cells of m_grid_may20 
+# the same standardisation values to all cells of m_grid_may20 
 sc
 mean_Bathy <- attributes(sc)$`scaled:center`[1]
 sd_Bathy <- attributes(sc)$`scaled:scale`[1]
