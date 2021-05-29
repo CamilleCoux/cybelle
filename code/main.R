@@ -1,4 +1,5 @@
-
+# Code by Camille Coux
+# 
 
 
 library(magrittr)
@@ -192,7 +193,13 @@ mapview(m_grid_may20, viewer.suppress=T, zcol="chla_quantiles")
 
 # 3. occupancy predictions based on chla variable
 m_grid_may20$chla_prediction <- p
-mapview(m_grid_may20, viewer.suppress=T, zcol="chla_prediction")
+fig <- mapview(m_grid_may20, viewer.suppress=T, zcol="chla_prediction")
+
+# To make these into .png files, this used to work, but generates an error now.
+# Maybe because of my recent R update ?
+# mapshot(m, file ="striped_dolphin_prediction_chla.png", 
+# map.types = "CartoDB.Positron")
+
 
 # 4. occupancy predictions based on chla variable - discretised using quantiles
 m_grid_may20$p_chla_quantiles <- cut(p,breaks= grid_occ_p,labels=labs) 
